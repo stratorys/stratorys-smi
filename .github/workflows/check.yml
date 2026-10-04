@@ -1,4 +1,4 @@
-name: Rust checks
+name: Rust checks and releases
 on:
   push:
   pull_request:
@@ -8,18 +8,89 @@ jobs:
   check:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-24.04
+            platform: linux-x86_64
+            architecture: x86_64
+          - os: macos-15
+            platform: macos-arm64
+            architecture: arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - run: rustup toolchain install 1.98.1 --profile minimal --component clippy
       - run: rustup toolchain install nightly-2026-09-25 --profile minimal --component rustfmt
+      - name: Validate release tag and runner architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.architecture }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "$EXPECTED_ARCH"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "stratorys-smi"))')
+            test "$GITHUB_REF_NAME" = "v$version"
+            test -f "docs/releases/$GITHUB_REF_NAME.md"
+          fi
       - run: cargo +nightly-2026-09-25 fmt --all --check
       - run: cargo +1.98.1 check --locked --all-targets
       - run: cargo +1.98.1 clippy --locked --all-targets --all-features -- -D warnings
       - run: cargo +1.98.1 test --locked --all-features
       - run: cargo +1.98.1 build --locked --release
+      - name: Smoke test executable
+        run: |
+          target/release/stratorys-smi --version
+          target/release/stratorys-smi --help
+          target/release/stratorys-smi --once
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: stratorys-smi-${{ matrix.os }}
           path: target/release/stratorys-smi
+      - name: Package release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p staging dist
+          cp target/release/stratorys-smi README.md LICENSE staging/
+          chmod 755 staging/stratorys-smi
+          COPYFILE_DISABLE=1 tar -czf "dist/stratorys-smi-$GITHUB_REF_NAME-$PLATFORM.tar.gz" -C staging stratorys-smi README.md LICENSE
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: release-${{ matrix.platform }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Download archives and create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name release-linux-x86_64 --dir dist
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name release-macos-arm64 --dir dist
+          cd dist
+          sha256sum "stratorys-smi-$GITHUB_REF_NAME-linux-x86_64.tar.gz" "stratorys-smi-$GITHUB_REF_NAME-macos-arm64.tar.gz" > SHA256SUMS
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            draft=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)
+            test "$draft" = true
+            gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Stratorys SMI $GITHUB_REF_NAME" --notes-file "../docs/releases/$GITHUB_REF_NAME.md"
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" ./*.tar.gz SHA256SUMS --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "Stratorys SMI $GITHUB_REF_NAME" --notes-file "../docs/releases/$GITHUB_REF_NAME.md" ./*.tar.gz SHA256SUMS
+          fi

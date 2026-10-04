@@ -2,6 +2,33 @@
 
 A small, native Rust hardware dashboard for Linux/NVIDIA and macOS on Apple silicon; Intel Macs are not supported. All output is English. Run it locally on the machine doing inference; no daemon, network listener, CUDA toolkit, or configuration file is needed.
 
+## Install from a release
+
+Download the archive for your machine and `SHA256SUMS` from [GitHub Releases](https://github.com/stratorys/stratorys-smi/releases). Release archives include the executable, this README and the license; Rust is not required.
+
+For Linux x86_64 (built on Ubuntu 24.04):
+
+```sh
+sha256sum --ignore-missing -c SHA256SUMS
+tar -xzf stratorys-smi-v0.1.0-linux-x86_64.tar.gz
+./stratorys-smi --once
+./stratorys-smi
+```
+
+For macOS Apple silicon (built on macOS 15), verify the downloaded archive against its matching entry in `SHA256SUMS`, then extract it:
+
+```sh
+shasum -a 256 stratorys-smi-v0.1.0-macos-arm64.tar.gz
+cat SHA256SUMS
+tar -xzf stratorys-smi-v0.1.0-macos-arm64.tar.gz
+./stratorys-smi --once
+./stratorys-smi
+```
+
+NVIDIA monitoring requires the installed NVIDIA driver and NVML library. Older OS versions have not been validated. The macOS executable is not signed or notarized; if macOS blocks it, use the **Open Anyway** control in System Settings > Privacy & Security for this executable.
+
+## Build from source
+
 ```sh
 cargo build --locked -p stratorys-smi --release
 ./target/release/stratorys-smi
@@ -43,6 +70,21 @@ Inventory and sensor discovery refresh every 30 seconds. The full macOS SMC and 
 The application performs read-only monitoring without network access. It starts no subprocess itself; on macOS, macmon runs `system_profiler` once only if native chip detection fails. That behavior is not an enforced sandbox. Vendor libraries and OS sensor calls can still block, so maximum collection latency must be measured on the actual host.
 
 ## Development and validation
+
+### Publishing a release
+
+The workflow checks Linux x86_64 and macOS ARM64 on fixed runner OS versions. A pushed `v*` tag must match the package version in `Cargo.toml` and have notes in `docs/releases/<tag>.md`. After both platforms pass checks, build and executable smoke tests, the workflow creates two archives and `SHA256SUMS`, then attaches them to a draft GitHub release. Only the release job has repository write permission. Rerunning the workflow updates an existing draft; it refuses to overwrite a published release.
+
+For the first release, after merging the release preparation and checking CI:
+
+```sh
+git tag -a v0.1.0 -m "Stratorys SMI v0.1.0"
+git push origin v0.1.0
+```
+
+Download and verify the draft's archives on both platforms. Check interactive resizing, `--once`, detail paging and terminal restoration. Review the release notes, then publish the draft in GitHub. Future releases must update the package version, lockfile, installation examples and release notes before tagging.
+
+### Local checks
 
 Rust 1.98.1 is pinned in `rust-toolchain.toml`. Formatting uses nightly-2026-09-25. GitHub Actions are pinned to verified full commit SHAs. CI checks macOS (Apple silicon) and Linux and produces one release executable for each runner architecture.
 
