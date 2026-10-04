@@ -1,0 +1,54 @@
+[package]
+name = "stratorys-smi"
+version = "0.1.0"
+description = "Native terminal hardware dashboard for Linux/NVIDIA and macOS (Apple silicon)"
+license = "MPL-2.0"
+authors = ["Stratorys", "Lucas Jahier <lucas.jahier@stratorys.com>"]
+repository = "https://github.com/stratorys/stratorys-smi"
+homepage = "https://github.com/stratorys/stratorys-smi"
+readme = "README.md"
+keywords = ["monitoring", "gpu", "nvidia", "apple-silicon", "tui"]
+categories = ["command-line-utilities", "hardware-support", "visualization", "os::macos-apis", "os::linux-apis"]
+include = ["src/**/*.rs", "assets/stratorys.png.base64", "README.md", "LICENSE"]
+edition = "2024"
+rust-version = "1.98.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[lints.rust]
+warnings = "deny"
+unsafe_code = "deny"
+
+[lints.clippy]
+uninlined_format_args = "deny"
+missing_assert_message = "deny"
+self_named_module_files = "deny"
+wildcard_imports = "deny"
+semicolon_outside_block = "deny"
+single_char_lifetime_names = "deny"
+str_to_string = "deny"
+unwrap_used = "deny"
+new_without_default = "allow"
+indexing_slicing = "deny"
+fallible_impl_from = "deny"
+wildcard_enum_match_arm = "deny"
+unneeded_field_pattern = "deny"
+fn_params_excessive_bools = "deny"
+struct_field_names = "allow"
+
+[dependencies]
+clap = { version = "4.6.7", default-features = false, features = ["derive", "std", "help", "usage", "error-context"] }
+crossterm = { version = "0.29", default-features = false, features = ["events"] }
+signal-hook = "0.3"
+sysinfo = { version = "0.39.6", default-features = false, features = ["system", "disk"] }
+thiserror = "2"
+unicode-width = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nvml-wrapper = "0.13"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+macmon = { git = "https://github.com/stratorys/macmon", rev = "3919334d132ed904a594192ed5b26fba025ac49b", default-features = false }

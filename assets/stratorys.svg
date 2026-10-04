@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Stratorys logo — square, dark</title>
+  <desc>Stratorys logo: four ascending strata on a dark ink background.</desc>
+  <rect width="1024" height="1024" rx="128" fill="#0F172A"/>
+  <rect x="208" y="320" width="608" height="20" fill="#FAFAF9" fill-opacity="0.4"/>
+  <rect x="208" y="432" width="608" height="36" fill="#FAFAF9" fill-opacity="0.6"/>
+  <rect x="208" y="564" width="608" height="56" fill="#FAFAF9" fill-opacity="0.8"/>
+  <rect x="208" y="708" width="608" height="84" fill="#FAFAF9"/>
+</svg>
